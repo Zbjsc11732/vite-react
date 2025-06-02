@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Split Bill Calculator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        .container {
+            max-width: 800px;
+            margin: auto;
+            padding: 20px;
+            border: 1px solid #ddd;
+            border-radius: 10px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+        table, th, td {
+            border: 1px solid #ddd;
+        }
+        th, td {
+            padding: 8px;
+            text-align: left;
+        }
+        .result {
+            margin-top: 20px;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            background-color: #f9f9f9;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Split Bill Calculator</h1>
+        <form id="billForm">
+            <div>
+                <label for="numPeople">Number of People:</label>
+                <input type="number" id="numPeople" min="1" required>
+                <button type="button" onclick="addPeople()">Add People</button>
+            </div>
+            <table id="peopleTable">
+                <thead>
+                    <tr>
+                        <th>Name</th>
+                        <th>Amount Paid</th>
+                        <th>Total Paid</th>
+                    </tr>
+                </thead>
+                <tbody>
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <td colspan="2"><strong>Grand Total</strong></td>
+                        <td id="totalPaid">0.00</td>
+                    </tr>
+                </tfoot>
+            </table>
+            <button type="button" onclick="calculateSplit()">Calculate</button>
+        </form>
+        <div id="results" class="result" style="display: none;"></div>
+    </div>
+
+    <script>
+        let people = [];
+
+        function addPeople() {
+            const numPeople = document.getElementById('numPeople').value;
+            const peopleTableBody = document.getElementById('peopleTable').querySelector('tbody');
+            peopleTableBody.innerHTML = ''; // ล้างข้อมูลเก่า
+
+            for (let i = 0; i < numPeople; i++) {
+                peopleTableBody.innerHTML += `
+                    <tr>
+                        <td><input type="text" id="person${i}" placeholder="Name" required></td>
+                        <td><input type="text" id="amount${i}" placeholder="Amount Paid" oninput="updateTotals(${i})"></td>
+                        <td id="totalPerson${i}">0.00</td>
+                    </tr>
+                `;
+            }
+        }
+
+        function updateTotals(index) {
+            const amountInput = document.getElementById(`amount${index}`).value;
+
+            // คำนวณผลรวมของ Amount Paid ของแต่ละคน
+            const totalPerson = evaluateExpression(amountInput) || 0;
+            document.getElementById(`totalPerson${index}`).innerText = totalPerson.toFixed(2);
+
+            // อัปเดตยอดรวมทั้งหมดในฟุตเตอร์
+            updateOverallTotal();
+        }
+
+        function updateOverallTotal() {
+            const numPeople = document.getElementById('numPeople').value;
+            let totalPaid = 0;
+
+            for (let i = 0; i < numPeople; i++) {
+                const amountInput = document.getElementById(`amount${i}`).value;
+                totalPaid += evaluateExpression(amountInput) || 0;
+            }
+
+            document.getElementById('totalPaid').innerText = totalPaid.toFixed(2);
+        }
+
+        function evaluateExpression(expression) {
+            try {
+                // ใช้ eval เพื่อคำนวณนิพจน์ทางคณิตศาสตร์
+                return Function(`"use strict"; return (${expression})`)();
+            } catch (error) {
+                return 0; // กรณีเกิดข้อผิดพลาด ให้คืนค่าเป็น 0
+            }
+        }
+
+        function calculateSplit() {
+            const numPeople = document.getElementById('numPeople').value;
+            people = [];
+            let totalPaid = 0;
+
+            // อ่านข้อมูลจากตารางและคำนวณผลรวม
+            for (let i = 0; i < numPeople; i++) {
+                const name = document.getElementById(`person${i}`).value || `Person ${i + 1}`;
+                const input = document.getElementById(`amount${i}`).value;
+                const amount = evaluateExpression(input) || 0;
+
+                totalPaid += amount;
+                people.push({ name, paid: amount, owes: 0 });
+            }
+
+            const perPerson = totalPaid / numPeople;
+
+            people.forEach(person => {
+                person.owes = perPerson - person.paid;
+            });
+
+            displayResults();
+        }
+
+        function displayResults() {
+            const resultsDiv = document.getElementById('results');
+            resultsDiv.style.display = 'block';
+            resultsDiv.innerHTML = '<h3>Transfers:</h3>';
+
+            const creditors = people.filter(p => p.owes < 0);
+            const debtors = people.filter(p => p.owes > 0);
+
+            debtors.forEach(debtor => {
+                while (debtor.owes > 0 && creditors.length > 0) {
+                    const creditor = creditors[0];
+                    const amount = Math.min(debtor.owes, Math.abs(creditor.owes));
+
+                    resultsDiv.innerHTML += `<p>${debtor.name} pays ${creditor.name} ${amount.toFixed(2)}</p>`;
+
+                    debtor.owes -= amount;
+                    creditor.owes += amount;
+
+                    if (Math.abs(creditor.owes) < 1e-6) {
+                        creditors.shift();
+                    }
+                }
+            });
+        }
+    </script>
+</body>
+</html>
